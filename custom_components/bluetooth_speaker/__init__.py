@@ -1,9 +1,14 @@
 """Initialize the Bluetooth Speaker component."""
 
+import logging
+import platform
+
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .coordinator import BluetoothSpeakerConfigEntry, BluetoothSpeakerCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [
     Platform.MEDIA_PLAYER,
@@ -12,6 +17,14 @@ PLATFORMS = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: BluetoothSpeakerConfigEntry) -> bool:
     """Set up Bluetooth speaker as config entry."""
+    if platform.system() != "Linux":
+        _LOGGER.error(
+            "Unsupported platform %s: " +
+            "Bluetooth speakers are currently only supported on Linux." +
+            "Aborting setup of configuration entry.",
+            platform.system(),
+        )
+        return False
 
     coordinator = BluetoothSpeakerCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
