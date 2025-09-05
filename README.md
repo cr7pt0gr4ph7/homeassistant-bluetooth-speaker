@@ -4,6 +4,29 @@
 
 This integration allows connecting Bluetooth speakers to the Home Assistant server.
 
+# Implementation
+
+This integration currently only works on Linux, as it is intended for use with Home Assistant OS.
+
+Seeing that there do not currently does not seem to be an actively maintained Python library for accessing and managing non-BLE Bluetooth devices, we directly access the BlueZ Bluetooth manager daemon via DBus instead.
+In the future, we might opt to extract that code into a separate Python package, as per the [Home Assistant developer checklist](https://developers.home-assistant.io/docs/development_checklist).
+
+Related libraries and why we're not using them:
+
+- [`pybluez`](https://github.com/pybluez/pybluez) supports non-BLE devices,
+  but is marked as unmaintained and its last update was in 2023.
+
+- [`habluetooth`](https://github.com/Bluetooth-Devices/habluetooth/) (which in turn uses [`bleak`](https://github.com/hbldh/bleak))
+  are multi-platform and support discovery of BLE (Bluetooth Low Enery) and non-BLE devices,
+  but do not support connection management for non-BLE devices.
+
+  We're actually using `habluetooth`/`bleak` under the hood for the discovery of our Bluetooth devices,
+  as that is what the [`bluetooth` integration](https://www.home-assistant.io/integrations/bluetooth)
+  uses for scanning & discovery, and switch over our custom DBus code for connecting to BlueZ.
+
+- [PyQt](https://www.riverbankcomputing.com/software/pyqt/) bindings for cross-platform [QtBluetooth](https://www.riverbankcomputing.com/static/Docs/PyQt6/api/qtbluetooth/qtbluetooth-module.html) API:
+  It's a large native library to pull in just to get access to a small API.
+
 # Installation
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
