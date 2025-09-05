@@ -9,7 +9,12 @@ This integration allows connecting Bluetooth speakers to the Home Assistant serv
 This integration currently only works on Linux, as it is intended for use with Home Assistant OS.
 
 Seeing that there do not currently does not seem to be an actively maintained Python library for accessing and managing non-BLE Bluetooth devices, we directly access the BlueZ Bluetooth manager daemon via DBus instead.
+
 In the future, we might opt to extract that code into a separate Python package, as per the [Home Assistant developer checklist](https://developers.home-assistant.io/docs/development_checklist).
+Possible locations for those libraries include
+the [`Bluetooth-Devices`](https://github.com/Bluetooth-Devices) (which already hosts [`bluetooth-adapters`](https://github.com/bluetooth-devices/bluetooth-adapters) and [`dbus-fast`](https://github.com/Bluetooth-Devices/dbus-fast) (which `bleak` uses on Linux))
+and [`home-assistant-libs`](https://github.com/home-assistant-libs) (which already hosts [`home-assistant-bluetooth`](https://github.com/home-assistant-libs/home-assistant-bluetooth))
+organizations on GitHub.
 
 Related libraries and why we're not using them:
 
