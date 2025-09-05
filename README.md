@@ -1,4 +1,6 @@
-# Customized Entity ID Generation
+# Home Assistant Bluetooth Speaker integration
+
+## 🚧 WARNING: This is currently an incomplete Work in Progress, and may not work at all, cause unepxected errors etc.!
 
 This integration allows connecting Bluetooth speakers to the Home Assistant server.
 
