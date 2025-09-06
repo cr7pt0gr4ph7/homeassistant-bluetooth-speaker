@@ -269,92 +269,9 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
                             self._device_path,
                         )
                     else:
-                        logger.debug("Connecting to BlueZ path %s", self._device_path)
-
-                        # Calling pair will fail if we are already paired, so
-                        # in that case we just call Connect.
-                        if pair and not manager.is_paired(self._device_path):
-                            # Trust means device is authorized
-                            reply = await self._bus.call(
-                                Message(
-                                    destination=defs.BLUEZ_SERVICE,
-                                    path=self._device_path,
-                                    interface=defs.PROPERTIES_INTERFACE,
-                                    member="Set",
-                                    signature="ssv",
-                                    body=[
-                                        defs.DEVICE_INTERFACE,
-                                        "Trusted",
-                                        Variant("b", True),
-                                    ],
-                                )
-                            )
-                            assert reply
-                            assert_reply(reply)
-
-                            # REVIST: This leaves "Trusted" property set if we
-                            # fail later. Probably not a big deal since we were
-                            # going to trust it anyway.
-
-                            # Pairing means device is authenticated
-                            reply = await self._bus.call(
-                                Message(
-                                    destination=defs.BLUEZ_SERVICE,
-                                    interface=defs.DEVICE_INTERFACE,
-                                    path=self._device_path,
-                                    member="Pair",
-                                )
-                            )
-
-                            # For resolvable private addresses, the address will
-                            # change after pairing, so we need to update that.
-                            # Hopefully there is no race condition here. D-Bus
-                            # traffic capture shows that Address change happens
-                            # at the same time as Paired property change and
-                            # that PropertiesChanged signal is sent before the
-                            # "Pair" reply is sent.
-                            self.address = manager.get_device_address(self._device_path)
-                        else:
-                            reply = await self._bus.call(
-                                Message(
-                                    destination=defs.BLUEZ_SERVICE,
-                                    interface=defs.DEVICE_INTERFACE,
-                                    path=self._device_path,
-                                    member="Connect",
-                                )
-                            )
-                        assert reply
-
-                        if reply.message_type == MessageType.ERROR:
-                            # This error is often caused by RF interference
-                            # from other Bluetooth or Wi-Fi devices. In many
-                            # cases, retrying will connect successfully.
-                            # Note: this error was added in BlueZ 6.62.
-                            if (
-                                reply.error_name == "org.bluez.Error.Failed"
-                                and reply.body
-                                and reply.body[0] == "le-connection-abort-by-local"
-                            ):
-                                logger.debug(
-                                    "retry due to le-connection-abort-by-local"
-                                )
-
-                                # When this error occurs, BlueZ actually
-                                # connected so we get "Connected" property changes
-                                # that we need to wait for before attempting
-                                # to connect again.
-                                await local_disconnect_monitor_event.wait()
-
-                                # Jump way back to the `while True:`` to retry.
-                                continue
-
-                            if reply.error_name == ErrorType.UNKNOWN_OBJECT.value:
-                                raise BleakDeviceNotFoundError(
-                                    self.address,
-                                    f"Device with address {self.address} was not found. It may have been removed from BlueZ when scanning stopped.",
-                                )
-
-                        assert_reply(reply)
+                        if not await self._connect_to_device(pair, local_disconnect_monitor_event, manager):
+                            # Jump way back to the `while True:`` to retry.
+                            continue
 
                     self._is_connected = True
 
@@ -371,6 +288,101 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
 
                     stack.pop_all()
                     return
+
+    async def _connect_to_device(self, pair: bool, local_disconnect_monitor_event: asyncio.Event, manager: BlueZManager) -> bool:
+        """
+        Requests BlueZ to connect to the device.
+
+        Returns false when the connection sequence should be retried due to a transient error.
+        """
+        logger.debug("Connecting to BlueZ path %s", self._device_path)
+        assert self._bus
+
+        # Calling pair will fail if we are already paired, so
+        # in that case we just call Connect.
+        if pair and not manager.is_paired(self._device_path):
+            # Trust means device is authorized
+            reply = await self._bus.call(
+                Message(
+                    destination=defs.BLUEZ_SERVICE,
+                    path=self._device_path,
+                    interface=defs.PROPERTIES_INTERFACE,
+                    member="Set",
+                    signature="ssv",
+                    body=[
+                        defs.DEVICE_INTERFACE,
+                        "Trusted",
+                        Variant("b", True),
+                    ],
+                )
+            )
+            assert reply
+            assert_reply(reply)
+
+            # REVIST: This leaves "Trusted" property set if we
+            # fail later. Probably not a big deal since we were
+            # going to trust it anyway.
+
+            # Pairing means device is authenticated
+            reply = await self._bus.call(
+                Message(
+                    destination=defs.BLUEZ_SERVICE,
+                    interface=defs.DEVICE_INTERFACE,
+                    path=self._device_path,
+                    member="Pair",
+                )
+            )
+
+            # For resolvable private addresses, the address will
+            # change after pairing, so we need to update that.
+            # Hopefully there is no race condition here. D-Bus
+            # traffic capture shows that Address change happens
+            # at the same time as Paired property change and
+            # that PropertiesChanged signal is sent before the
+            # "Pair" reply is sent.
+            self.address = manager.get_device_address(self._device_path)
+        else:
+            reply = await self._bus.call(
+                Message(
+                    destination=defs.BLUEZ_SERVICE,
+                    interface=defs.DEVICE_INTERFACE,
+                    path=self._device_path,
+                    member="Connect",
+                )
+            )
+        assert reply
+
+        if reply.message_type == MessageType.ERROR:
+            # This error is often caused by RF interference
+            # from other Bluetooth or Wi-Fi devices. In many
+            # cases, retrying will connect successfully.
+            # Note: this error was added in BlueZ 6.62.
+            if (
+                reply.error_name == "org.bluez.Error.Failed"
+                and reply.body
+                and reply.body[0] == "le-connection-abort-by-local"
+            ):
+                logger.debug(
+                    "retry due to le-connection-abort-by-local"
+                )
+
+                # When this error occurs, BlueZ actually
+                # connected so we get "Connected" property changes
+                # that we need to wait for before attempting
+                # to connect again.
+                await local_disconnect_monitor_event.wait()
+
+                # Jump way back to the `while True:`` to retry.
+                return False
+
+            if reply.error_name == ErrorType.UNKNOWN_OBJECT.value:
+                raise BleakDeviceNotFoundError(
+                    self.address,
+                    f"Device with address {self.address} was not found. It may have been removed from BlueZ when scanning stopped.",
+                )
+
+        assert_reply(reply)
+        return True
 
     @staticmethod
     async def _disconnect_monitor(
