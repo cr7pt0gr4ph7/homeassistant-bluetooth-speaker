@@ -33,7 +33,7 @@ from dbus_fast.signature import Variant
 
 from bleak import BleakScanner
 from bleak.backends.bluezdbus import defs
-from bleak.backends.bluezdbus.manager import get_global_bluez_manager
+from bleak.backends.bluezdbus.manager import BlueZManager, get_global_bluez_manager
 from bleak.backends.bluezdbus.scanner import BleakScannerBlueZDBus
 from bleak.backends.bluezdbus.utils import assert_reply, get_dbus_authenticator
 from bleak.backends.bluezdbus.version import BlueZFeatures
@@ -125,6 +125,40 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
 
         stack.callback(self._cleanup_all)
 
+    async def _setup_device_watcher(self, manager: BlueZManager):
+        """Register for device notifications."""
+        def on_connected_changed(connected: bool) -> None:
+            if not connected:
+                logger.debug("Device disconnected (%s)", self._device_path)
+
+                self._is_connected = False
+
+                if self._disconnect_monitor_event:
+                    self._disconnect_monitor_event.set()
+                    self._disconnect_monitor_event = None
+
+                self._cleanup_all()
+                if self._disconnected_callback is not None:
+                    self._disconnected_callback()
+                disconnecting_event = self._disconnecting_event
+                if disconnecting_event:
+                    disconnecting_event.set()
+
+        def on_characteristic_value_changed(char_path: str, value: bytes) -> None:
+            # We don't actually care about GATT characteristics in
+            # BluetoothClientBlueZDBus, this is just a stub for
+            # compatibility with the existing Bleak infrastructure.
+            pass
+
+        watcher = manager.add_device_watcher(
+            self._device_path,
+            on_connected_changed,
+            on_characteristic_value_changed,
+        )
+        self._remove_device_watcher = lambda: manager.remove_device_watcher(
+            watcher
+        )
+
     # Connectivity methods
 
     @override
@@ -177,38 +211,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
                     # Each BLE connection session needs a new D-Bus connection to avoid a
                     # BlueZ quirk where notifications are automatically enabled on reconnect.
                     await self._setup_dbus_connection(stack)
-
-                    def on_connected_changed(connected: bool) -> None:
-                        if not connected:
-                            logger.debug("Device disconnected (%s)", self._device_path)
-
-                            self._is_connected = False
-
-                            if self._disconnect_monitor_event:
-                                self._disconnect_monitor_event.set()
-                                self._disconnect_monitor_event = None
-
-                            self._cleanup_all()
-                            if self._disconnected_callback is not None:
-                                self._disconnected_callback()
-                            disconnecting_event = self._disconnecting_event
-                            if disconnecting_event:
-                                disconnecting_event.set()
-
-                    def on_characteristic_value_changed(char_path: str, value: bytes) -> None:
-                        # We don't actually care about GATT characteristics in
-                        # BluetoothClientBlueZDBus, this is just a stub for
-                        # compatibility with the existing Bleak infrastructure.
-                        pass
-
-                    watcher = manager.add_device_watcher(
-                        self._device_path,
-                        on_connected_changed,
-                        on_characteristic_value_changed
-                    )
-                    self._remove_device_watcher = lambda: manager.remove_device_watcher(
-                        watcher
-                    )
+                    await self._setup_device_watcher(manager)
 
                     self._disconnect_monitor_event = local_disconnect_monitor_event = (
                         asyncio.Event()
