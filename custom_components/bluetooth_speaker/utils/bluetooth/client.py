@@ -133,12 +133,13 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
 
     async def _ensure_device_resolved(self, timeout: Any) -> None:
         if self._device_path is None:
-            device = await BleakScanner.find_device_by_address(
-                self.address,
-                timeout=timeout,
-                adapter=self._adapter,
-                backend=BleakScannerBlueZDBus,
-            )
+            # device = await BleakScanner.find_device_by_address(
+            #     self.address,
+            #     timeout=timeout,
+            #     adapter=self._adapter,
+            #     backend=BleakScannerBlueZDBus,
+            # )
+            device = await self._resolve_device_from_manager()
 
             if device:
                 self._device_info = device.details.get("props")
@@ -147,6 +148,20 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
                 raise BleakDeviceNotFoundError(
                     self.address, f"Device with address {self.address} was not found."
                 )
+
+    async def _resolve_device_from_manager(self) -> BLEDevice | None:
+        manager = await get_global_bluez_manager()
+
+        for device_path in manager._properties:
+            if defs.DEVICE_INTERFACE in manager._properties[device_path]:
+                props = manager._properties[device_path][defs.DEVICE_INTERFACE]
+                if props["Address"] == self.address:
+                    return BLEDevice(props["Address"], props["Name"], {
+                        "details": props,
+                        "path": device_path,
+                    })
+
+        return None
 
     async def _ensure_dbus_connection(self) -> None:
         """Ensure that we are connected to D-Bus."""
