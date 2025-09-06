@@ -111,6 +111,23 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
 
     # Internal methods
 
+    async def _ensure_device_resolved(self, timeout: Any) -> None:
+        if self._device_path is None:
+            device = await BleakScanner.find_device_by_address(
+                self.address,
+                timeout=timeout,
+                adapter=self._adapter,
+                backend=BleakScannerBlueZDBus,
+            )
+
+            if device:
+                self._device_info = device.details.get("props")
+                self._device_path = device.details["path"]
+            else:
+                raise BleakDeviceNotFoundError(
+                    self.address, f"Device with address {self.address} was not found."
+                )
+
     async def _ensure_dbus_connection(self) -> None:
         """Ensure that we are connected to D-Bus."""
         if not self._bus:
@@ -199,21 +216,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         # A Discover must have been run before connecting to any devices.
         # Find the desired device before trying to connect.
         timeout = kwargs.get("timeout", self._timeout)
-        if self._device_path is None:
-            device = await BleakScanner.find_device_by_address(
-                self.address,
-                timeout=timeout,
-                adapter=self._adapter,
-                backend=BleakScannerBlueZDBus,
-            )
-
-            if device:
-                self._device_info = device.details.get("props")
-                self._device_path = device.details["path"]
-            else:
-                raise BleakDeviceNotFoundError(
-                    self.address, f"Device with address {self.address} was not found."
-                )
+        await self._ensure_device_resolved(timeout)
 
         manager = await get_global_bluez_manager()
 
