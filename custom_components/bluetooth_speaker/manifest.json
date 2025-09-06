@@ -6,12 +6,10 @@
             "service_uuid": "0000110b-0000-1000-8000-00805f9b34fb"
         }
     ],
-    "codeowners": [
-        "@cr7pt0gr4ph7"
-    ],
-    "dependencies": [
-        "bluetooth_adapters"
-    ],
+
+    "codeowners": ["@cr7pt0gr4ph7"],
+    "config_flow": true,
+    "dependencies": ["bluetooth_adapters"],
     "documentation": "https://github.com/cr7pt0gr4ph7/home-assistant-bluetooth-speaker",
     "iot_class": "local_polling",
     "requirements": [],
