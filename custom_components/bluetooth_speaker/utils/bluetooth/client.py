@@ -37,11 +37,8 @@ from bleak.backends.bluezdbus.manager import get_global_bluez_manager
 from bleak.backends.bluezdbus.scanner import BleakScannerBlueZDBus
 from bleak.backends.bluezdbus.utils import assert_reply, get_dbus_authenticator
 from bleak.backends.bluezdbus.version import BlueZFeatures
-from bleak.backends.characteristic import BleakGATTCharacteristic
-from bleak.backends.client import BaseBleakClient, NotifyCallback
-from bleak.backends.descriptor import BleakGATTDescriptor
+from bleak.backends.client import BaseBleakClient
 from bleak.backends.device import BLEDevice
-from bleak.backends.service import BleakGATTServiceCollection
 from bleak.exc import BleakDBusError, BleakDeviceNotFoundError, BleakError
 
 logger = logging.getLogger(__name__)
@@ -118,7 +115,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
 
     @override
     async def connect(
-        self, pair: bool, dangerous_use_bleak_cache: bool = False, **kwargs: Any
+        self, pair: bool, **kwargs: Any
     ) -> None:
         """Connect to the specified GATT server.
 
@@ -357,12 +354,6 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
                     _background_tasks.add(task)
                     task.add_done_callback(_background_tasks.discard)
 
-                    # We will try to use the cache if it exists and `dangerous_use_bleak_cache`
-                    # is True.
-                    await self._get_services(
-                        dangerous_use_bleak_cache=dangerous_use_bleak_cache
-                    )
-
                     stack.pop_all()
                     return
 
@@ -426,9 +417,6 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
             # closed above. If not, calls made to it later could lead to
             # a stuck client.
             self._bus = None
-
-            # Reset all stored services.
-            self.services = None
 
     @override
     async def disconnect(self) -> None:
@@ -694,270 +682,3 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
             return 23
 
         return self._mtu_size
-
-    # GATT services methods
-
-    async def _get_services(
-        self, dangerous_use_bleak_cache: bool = False, **kwargs: Any
-    ) -> BleakGATTServiceCollection:
-        """Get all services registered for this GATT server.
-
-        Args:
-            dangerous_use_bleak_cache (bool): Use cached services if available.
-
-        Returns:
-           A :py:class:`bleak.backends.service.BleakGATTServiceCollection` with this device's services tree.
-
-        """
-        if not self.is_connected:
-            raise BleakError("Not connected")
-
-        if self.services is not None:
-            return self.services
-
-        manager = await get_global_bluez_manager()
-
-        self.services = await manager.get_services(
-            self._device_path, dangerous_use_bleak_cache, self._requested_services
-        )
-
-        return self.services
-
-    # IO methods
-
-    @override
-    async def read_gatt_char(
-        self, characteristic: BleakGATTCharacteristic, **kwargs: Any
-    ) -> bytearray:
-        """Perform read operation on the specified GATT characteristic.
-
-        Args:
-            characteristic (BleakGATTCharacteristic): The characteristic to read from.
-
-        Returns:
-            (bytearray) The read data.
-
-        """
-        if not self.is_connected:
-            raise BleakError("Not connected")
-
-        while True:
-            assert self._bus
-
-            reply = await self._bus.call(
-                Message(
-                    destination=defs.BLUEZ_SERVICE,
-                    path=characteristic.obj[0],
-                    interface=defs.GATT_CHARACTERISTIC_INTERFACE,
-                    member="ReadValue",
-                    signature="a{sv}",
-                    body=[{}],
-                )
-            )
-
-            assert reply
-
-            if reply.error_name == "org.bluez.Error.InProgress":
-                logger.debug("retrying characteristic ReadValue due to InProgress")
-                # Avoid calling in a tight loop. There is no dbus signal to
-                # indicate ready, so unfortunately, we have to poll.
-                await asyncio.sleep(0.01)
-                continue
-
-            assert_reply(reply)
-            break
-
-        value = bytearray(reply.body[0])
-
-        logger.debug(
-            "Read Characteristic {0} | {1}: {2}".format(
-                characteristic.uuid, characteristic.obj[0], value
-            )
-        )
-        return value
-
-    @override
-    async def read_gatt_descriptor(
-        self, descriptor: BleakGATTDescriptor, **kwargs: Any
-    ) -> bytearray:
-        """Perform read operation on the specified GATT descriptor.
-
-        Args:
-            descriptor: The descriptor to read from.
-
-        Returns:
-            The read data.
-        """
-        if not self.is_connected:
-            raise BleakError("Not connected")
-
-        while True:
-            assert self._bus
-
-            reply = await self._bus.call(
-                Message(
-                    destination=defs.BLUEZ_SERVICE,
-                    path=descriptor.obj[0],
-                    interface=defs.GATT_DESCRIPTOR_INTERFACE,
-                    member="ReadValue",
-                    signature="a{sv}",
-                    body=[{}],
-                )
-            )
-
-            assert reply
-
-            if reply.error_name == "org.bluez.Error.InProgress":
-                logger.debug("retrying descriptor ReadValue due to InProgress")
-                # Avoid calling in a tight loop. There is no dbus signal to
-                # indicate ready, so unfortunately, we have to poll.
-                await asyncio.sleep(0.01)
-                continue
-
-            assert_reply(reply)
-            break
-
-        value = bytearray(reply.body[0])
-
-        logger.debug(
-            "Read Descriptor %s | %s: %s", descriptor.handle, descriptor.obj[0], value
-        )
-        return value
-
-    @override
-    async def write_gatt_char(
-        self, characteristic: BleakGATTCharacteristic, data: Buffer, response: bool
-    ) -> None:
-        if not self.is_connected:
-            raise BleakError("Not connected")
-
-        while True:
-            assert self._bus
-
-            reply = await self._bus.call(
-                Message(
-                    destination=defs.BLUEZ_SERVICE,
-                    path=characteristic.obj[0],
-                    interface=defs.GATT_CHARACTERISTIC_INTERFACE,
-                    member="WriteValue",
-                    signature="aya{sv}",
-                    body=[
-                        bytes(data),
-                        {"type": Variant("s", "request" if response else "command")},
-                    ],
-                )
-            )
-
-            assert reply
-
-            if reply.error_name == "org.bluez.Error.InProgress":
-                logger.debug("retrying characteristic WriteValue due to InProgress")
-                # Avoid calling in a tight loop. There is no dbus signal to
-                # indicate ready, so unfortunately, we have to poll.
-                await asyncio.sleep(0.01)
-                continue
-
-            assert_reply(reply)
-            break
-
-        logger.debug(
-            "Write Characteristic %s | %s: %s",
-            characteristic.uuid,
-            characteristic.obj[0],
-            data,
-        )
-
-    @override
-    async def write_gatt_descriptor(
-        self, descriptor: BleakGATTDescriptor, data: Buffer
-    ) -> None:
-        """Perform a write operation on the specified GATT descriptor.
-
-        Args:
-            handle: The handle of the descriptor to read from.
-            data: The data to send (any bytes-like object).
-
-        """
-        if not self.is_connected:
-            raise BleakError("Not connected")
-
-        while True:
-            assert self._bus
-
-            reply = await self._bus.call(
-                Message(
-                    destination=defs.BLUEZ_SERVICE,
-                    path=descriptor.obj[0],
-                    interface=defs.GATT_DESCRIPTOR_INTERFACE,
-                    member="WriteValue",
-                    signature="aya{sv}",
-                    body=[bytes(data), {"type": Variant("s", "command")}],
-                )
-            )
-
-            assert reply
-
-            if reply.error_name == "org.bluez.Error.InProgress":
-                logger.debug("retrying descriptor WriteValue due to InProgress")
-                # Avoid calling in a tight loop. There is no dbus signal to
-                # indicate ready, so unfortunately, we have to poll.
-                await asyncio.sleep(0.01)
-                continue
-
-            assert_reply(reply)
-            break
-
-        logger.debug(
-            "Write Descriptor %s | %s: %s", descriptor.handle, descriptor.obj[0], data
-        )
-
-    @override
-    async def start_notify(
-        self,
-        characteristic: BleakGATTCharacteristic,
-        callback: NotifyCallback,
-        **kwargs: Any,
-    ) -> None:
-        """
-        Activate notifications/indications on a characteristic.
-        """
-        self._notification_callbacks[characteristic.obj[0]] = callback
-
-        assert self._bus is not None
-
-        reply = await self._bus.call(
-            Message(
-                destination=defs.BLUEZ_SERVICE,
-                path=characteristic.obj[0],
-                interface=defs.GATT_CHARACTERISTIC_INTERFACE,
-                member="StartNotify",
-            )
-        )
-        assert reply
-        assert_reply(reply)
-
-    @override
-    async def stop_notify(self, characteristic: BleakGATTCharacteristic) -> None:
-        """Deactivate notification/indication on a specified characteristic.
-
-        Args:
-            characteristic (BleakGATTCharacteristic): The characteristic to deactivate
-                notification/indication on.
-        """
-        if not self.is_connected:
-            raise BleakError("Not connected")
-
-        assert self._bus is not None
-
-        reply = await self._bus.call(
-            Message(
-                destination=defs.BLUEZ_SERVICE,
-                path=characteristic.obj[0],
-                interface=defs.GATT_CHARACTERISTIC_INTERFACE,
-                member="StopNotify",
-            )
-        )
-        assert reply
-        assert_reply(reply)
-
-        self._notification_callbacks.pop(characteristic.obj[0], None)
