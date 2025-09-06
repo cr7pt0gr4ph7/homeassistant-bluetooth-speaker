@@ -249,6 +249,9 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
 
         manager = await get_global_bluez_manager()
 
+        # Terminate existing D-Bus connection if there is one
+        self._cleanup_bus()
+
         async with async_timeout(timeout):
             while True:
                 async with AsyncExitStack() as stack:
