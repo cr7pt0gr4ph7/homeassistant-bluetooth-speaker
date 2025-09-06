@@ -172,10 +172,10 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         assert not self._remove_device_watcher
 
         def on_connected_changed(connected: bool) -> None:
+            self._is_connected = connected
+
             if not connected:
                 logger.debug("Device disconnected (%s)", self._device_path)
-
-                self._is_connected = False
 
                 if self._disconnect_monitor_event:
                     self._disconnect_monitor_event.set()
@@ -298,8 +298,6 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
                         if not await self._connect_to_device(pair, local_disconnect_monitor_event, manager):
                             # Jump way back to the `while True:`` to retry.
                             continue
-
-                    self._is_connected = True
 
                     # Create a task that runs until the device is disconnected.
                     task = asyncio.create_task(
@@ -647,7 +645,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
             Boolean representing connection status.
 
         """
-        return False if self._bus is None else self._is_connected
+        return self._is_connected
 
     async def _get_adapter_path(self) -> str:
         """Private coroutine to return the BlueZ path to the adapter this client is assigned to.
