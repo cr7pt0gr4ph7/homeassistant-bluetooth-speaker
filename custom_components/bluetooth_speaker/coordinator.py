@@ -33,6 +33,10 @@ class BluetoothSpeakerDevice:
         self.ble_device = ble_device
         self.client = BluetoothClientBlueZDBus(ble_device)
 
+    async def setup(self) -> None:
+        """Finish initialization."""
+        await self.client.setup()
+
     @property
     def address(self) -> str:
         """Gets the address of the Bluetooth device."""
@@ -76,15 +80,10 @@ class BluetoothSpeakerCoordinator(DataUpdateCoordinator[None]):
 
         assert address is not None
 
-        ble_device = bluetooth.async_ble_device_from_address(
-            self.hass, address)
+        self.device = BluetoothSpeakerDevice(address)
 
-        if not ble_device:
-            raise ConfigEntryNotReady(
-                f"Could not find Bluetooth device with address {address}"
-            )
-
-        self.device = BluetoothSpeakerDevice(ble_device)
+        # Subscribe to status updates
+        await self.device.setup()
 
     async def _async_update_data(self) -> None:
         """Update status of Bluetooth speaker."""
