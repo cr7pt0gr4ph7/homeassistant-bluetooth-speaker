@@ -26,7 +26,7 @@ async def async_setup_entry(
     coordinator = config_entry.runtime_data
     await async_add_entities([
         BluetoothSpeakerPlayer(
-            config_entry.options[CONF_NAME],
+            config_entry.data[CONF_NAME],
             coordinator,
         )
     ])
