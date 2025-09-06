@@ -9,6 +9,7 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -49,6 +50,7 @@ class BluetoothSpeakerPlayer(CoordinatorEntity[BluetoothSpeakerCoordinator], Med
         """Initialize the Bluetooth speaker device."""
         super().__init__(coordinator)
         self._attr_name = name
+        self._attr_unique_id = format_mac(coordinator.device.address)
         self._attr_device_info = dr.DeviceInfo(
             identifiers={(DOMAIN, coordinator.device.address)},
             connections={(dr.CONNECTION_BLUETOOTH, coordinator.device.address)},
