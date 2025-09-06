@@ -110,7 +110,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
     async def connect(
         self, pair: bool, **kwargs: Any
     ) -> None:
-        """Connect to the specified GATT server.
+        """Connect to the specified Bluetooth device.
 
         Keyword Args:
             timeout (float): Timeout for required ``BleakScanner.find_device_by_address`` call. Defaults to 10.0.
@@ -417,7 +417,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
 
     @override
     async def disconnect(self) -> None:
-        """Disconnect from the specified GATT server.
+        """Disconnect from the specified Bluetooth device.
 
         Raises:
             BleakDBusError: If there was a D-Bus error
