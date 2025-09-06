@@ -105,11 +105,6 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         self._disconnecting_event: Optional[asyncio.Event] = None
         # used to ensure device gets disconnected if event loop crashes
         self._disconnect_monitor_event: Optional[asyncio.Event] = None
-        # map of characteristic D-Bus object path to notification callback
-        self._notification_callbacks: dict[str, NotifyCallback] = {}
-
-        # used to override mtu_size property
-        self._mtu_size: Optional[int] = None
 
     # Connectivity methods
 
@@ -187,14 +182,16 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
                             if disconnecting_event:
                                 disconnecting_event.set()
 
-                    def on_value_changed(char_path: str, value: bytes) -> None:
-                        callback = self._notification_callbacks.get(char_path)
-
-                        if callback:
-                            callback(bytearray(value))
+                    def on_characteristic_value_changed(char_path: str, value: bytes) -> None:
+                        # We don't actually care about GATT characteristics in
+                        # BluetoothClientBlueZDBus, this is just a stub for
+                        # compatibility with the existing Bleak infrastructure.
+                        pass
 
                     watcher = manager.add_device_watcher(
-                        self._device_path, on_connected_changed, on_value_changed
+                        self._device_path,
+                        on_connected_changed,
+                        on_characteristic_value_changed
                     )
                     self._remove_device_watcher = lambda: manager.remove_device_watcher(
                         watcher
@@ -581,57 +578,6 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         """
         return False if self._bus is None else self._is_connected
 
-    async def _acquire_mtu(self) -> None:
-        """Acquires the MTU for this device by calling the "AcquireWrite" or
-        "AcquireNotify" method of the first characteristic that has such a method.
-
-        This method only needs to be called once, after connecting to the device
-        but before accessing the ``mtu_size`` property.
-
-        If a device uses encryption on characteristics, it will need to be bonded
-        first before calling this method.
-        """
-
-        assert (
-            self.services is not None
-        ), "Services must be acquired before acquiring MTU"
-
-        # This will try to get the "best" characteristic for getting the MTU.
-        # We would rather not start notifications if we don't have to.
-        try:
-            method = "AcquireWrite"
-            char = next(
-                c
-                for c in self.services.characteristics.values()
-                if "write-without-response" in c.properties
-            )
-        except StopIteration:
-            method = "AcquireNotify"
-            char = next(
-                c
-                for c in self.services.characteristics.values()
-                if "notify" in c.properties
-            )
-
-        assert self._bus
-
-        reply = await self._bus.call(
-            Message(
-                destination=defs.BLUEZ_SERVICE,
-                path=char.obj[0],
-                interface=defs.GATT_CHARACTERISTIC_INTERFACE,
-                member=method,
-                signature="a{sv}",
-                body=[{}],
-            )
-        )
-        assert reply
-        assert_reply(reply)
-
-        # we aren't actually using the write or notify, we just want the MTU
-        os.close(reply.unix_fds[0])
-        self._mtu_size = reply.body[1]
-
     async def _get_adapter_path(self) -> str:
         """Private coroutine to return the BlueZ path to the adapter this client is assigned to.
 
@@ -670,15 +616,3 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         if self._device_info is None:
             raise BleakError("Not connected")
         return self._device_info["Alias"]
-
-    @property
-    @override
-    def mtu_size(self) -> int:
-        """Get ATT MTU size for active connection"""
-        if self._mtu_size is None:
-            warnings.warn(
-                "Using default MTU value. Call _acquire_mtu() or set _mtu_size first to avoid this warning."
-            )
-            return 23
-
-        return self._mtu_size
