@@ -368,20 +368,22 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         try:
             await disconnect_monitor_event.wait()
         except asyncio.CancelledError:
-            try:
-                # by using send() instead of call(), we ensure that the message
-                # gets sent, but we don't wait for a reply, which could take
-                # over one second while the device disconnects.
-                await bus.send(
-                    Message(
-                        destination=defs.BLUEZ_SERVICE,
-                        path=device_path,
-                        interface=defs.DEVICE_INTERFACE,
-                        member="Disconnect",
+            automatic_disconnect = False
+            if automatic_disconnect:
+                try:
+                    # by using send() instead of call(), we ensure that the message
+                    # gets sent, but we don't wait for a reply, which could take
+                    # over one second while the device disconnects.
+                    await bus.send(
+                        Message(
+                            destination=defs.BLUEZ_SERVICE,
+                            path=device_path,
+                            interface=defs.DEVICE_INTERFACE,
+                            member="Disconnect",
+                        )
                     )
-                )
-            except Exception:
-                pass
+                except Exception:
+                    pass
 
     def _cleanup_all(self) -> None:
         """
