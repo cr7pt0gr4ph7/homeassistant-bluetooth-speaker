@@ -409,10 +409,23 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         eventually cleanup all otherwise leaked resources.
         """
         logger.debug("_cleanup_all(%s)", self._device_path)
+        self._cleanup_device_watcher()
+        self._cleanup_bus()
+
+    def _cleanup_device_watcher(self) -> None:
+        """Unregister the device watcher."""
+        logger.debug("_cleanup_device_watcher(%s)", self._device_path)
 
         if self._remove_device_watcher:
             self._remove_device_watcher()
             self._remove_device_watcher = None
+
+    def _cleanup_bus(self) -> None:
+        """
+        Free all the allocated resource in DBus. Use this method to
+        eventually cleanup all otherwise leaked resources.
+        """
+        logger.debug("_cleanup_bus(%s)", self._device_path)
 
         if not self._bus:
             logger.debug("already disconnected (%s)", self._device_path)
