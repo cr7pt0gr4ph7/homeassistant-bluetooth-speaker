@@ -37,7 +37,9 @@ from bleak.backends.bluezdbus.manager import get_global_bluez_manager
 from bleak.backends.bluezdbus.scanner import BleakScannerBlueZDBus
 from bleak.backends.bluezdbus.utils import assert_reply, get_dbus_authenticator
 from bleak.backends.bluezdbus.version import BlueZFeatures
-from bleak.backends.client import BaseBleakClient
+from bleak.backends.characteristic import BleakGATTCharacteristic
+from bleak.backends.client import BaseBleakClient, NotifyCallback
+from bleak.backends.descriptor import BleakGATTDescriptor
 from bleak.backends.device import BLEDevice
 from bleak.exc import BleakDBusError, BleakDeviceNotFoundError, BleakError
 
@@ -612,3 +614,51 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         if self._device_info is None:
             raise BleakError("Not connected")
         return self._device_info["Alias"]
+
+    @property
+    @override
+    def mtu_size(self) -> int:
+        """Stub methods"""
+        raise NotImplementedError()
+
+    @override
+    async def read_gatt_char(
+        self, characteristic: BleakGATTCharacteristic, **kwargs: Any
+    ) -> bytearray:
+        """Stub method."""
+        raise NotImplementedError()
+
+    @override
+    async def read_gatt_descriptor(
+        self, descriptor: BleakGATTDescriptor, **kwargs: Any
+    ) -> bytearray:
+        """Stub method."""
+        raise NotImplementedError()
+
+    @override
+    async def write_gatt_char(
+        self, characteristic: BleakGATTCharacteristic, data: Buffer, response: bool
+    ) -> None:
+        raise NotImplementedError()
+
+    @override
+    async def write_gatt_descriptor(
+        self, descriptor: BleakGATTDescriptor, data: Buffer
+    ) -> None:
+        """Stub method."""
+        raise NotImplementedError()
+
+    @override
+    async def start_notify(
+        self,
+        characteristic: BleakGATTCharacteristic,
+        callback: NotifyCallback,
+        **kwargs: Any,
+    ) -> None:
+        """Stub method."""
+        raise NotImplementedError()
+
+    @override
+    async def stop_notify(self, characteristic: BleakGATTCharacteristic) -> None:
+        """Stub method."""
+        raise NotImplementedError()
