@@ -109,9 +109,11 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
     async def _ensure_dbus_connection(self) -> None:
         """Ensure that we are connected to D-Bus."""
         if not self._bus:
-            await self._setup_dbus_connection()
+            async with AsyncExitStack() as stack:
+                await self._setup_dbus_connection(stack)
+                stack.pop_all()
 
-    async def _setup_dbus_connection(self) -> None:
+    async def _setup_dbus_connection(self, stack: AsyncExitStack) -> None:
         """Establish connection to D-Bus."""
         assert not self._bus
 
@@ -120,6 +122,8 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
             negotiate_unix_fd=True,
             auth=get_dbus_authenticator(),
         ).connect()
+
+        stack.callback(self._cleanup_all)
 
     # Connectivity methods
 
@@ -172,9 +176,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
                 async with AsyncExitStack() as stack:
                     # Each BLE connection session needs a new D-Bus connection to avoid a
                     # BlueZ quirk where notifications are automatically enabled on reconnect.
-                    await self._setup_dbus_connection()
-
-                    stack.callback(self._cleanup_all)
+                    await self._setup_dbus_connection(stack)
 
                     def on_connected_changed(connected: bool) -> None:
                         if not connected:
