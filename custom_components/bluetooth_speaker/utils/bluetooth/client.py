@@ -509,7 +509,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         """
         logger.debug("Disconnecting ({%s})", self._device_path)
 
-        if self._bus is None:
+        if not self._is_connected:
             # No connection exists. Either one hasn't been created or
             # we have already called disconnect and closed the D-Bus
             # connection.
@@ -524,6 +524,9 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         elif self.is_connected:
             self._disconnecting_event = asyncio.Event()
             try:
+                # We need a D-Bus connection to disconnect the device
+                await self._ensure_dbus_connection()
+
                 # Try to disconnect the actual device/peripheral
                 reply = await self._bus.call(
                     Message(
@@ -539,10 +542,6 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
                     await self._disconnecting_event.wait()
             finally:
                 self._disconnecting_event = None
-
-        # sanity check to make sure _cleanup_all() was triggered by the
-        # "PropertiesChanged" signal handler and that it completed successfully
-        assert self._bus is None
 
     @override
     async def pair(self, *args: Any, **kwargs: Any) -> None:
