@@ -16,6 +16,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
+from .utils.bluetooth.client import BluetoothClientBlueZDBus
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class BluetoothSpeakerDevice:
     def __init__(self, ble_device: BLEDevice):
         """Initialize the device representation."""
         self.ble_device = ble_device
-        self.client = BleakClient(ble_device)
+        self.client = BluetoothClientBlueZDBus(ble_device)
 
     @property
     def address(self) -> str:
