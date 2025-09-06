@@ -104,6 +104,11 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         # used to ensure device gets disconnected if event loop crashes
         self._disconnect_monitor_event: Optional[asyncio.Event] = None
 
+        stack = AsyncExitStack()
+        manager = get_global_bluez_manager()
+        self._setup_device_watcher(manager, stack)
+        stack.pop_all()
+
     # Internal methods
 
     async def _ensure_dbus_connection(self) -> None:
@@ -127,6 +132,11 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
 
     def _setup_device_watcher(self, manager: BlueZManager, stack: AsyncExitStack):
         """Register for device notifications."""
+
+        # Unregister first if already registered
+        if self._remove_device_watcher:
+            self._cleanup_device_watcher()
+
         def on_connected_changed(connected: bool) -> None:
             if not connected:
                 logger.debug("Device disconnected (%s)", self._device_path)
