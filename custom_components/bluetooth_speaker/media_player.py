@@ -11,7 +11,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers import device_registry as dr
 
+from .const import DOMAIN
 from .coordinator import BluetoothSpeakerConfigEntry
 
 
@@ -45,6 +47,10 @@ class BluetoothSpeakerPlayer(MediaPlayerEntity):
     def __init__(self, name: str, address: str) -> None:
         """Initialize the Bluetooth speaker device."""
         self._attr_name = name
+        self._attr_device_info = dr.DeviceInfo(
+            identifiers={(DOMAIN, address)},
+            connections={(dr.CONNECTION_BLUETOOTH, address)},
+        )
         self._attr_state = MediaPlayerState.OFF
         self._attr_volume_level = 1.0
         self._attr_is_volume_muted = False
