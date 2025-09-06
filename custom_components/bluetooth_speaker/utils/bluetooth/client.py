@@ -482,7 +482,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         assert reply
         assert_reply(reply)
         if reply.body[0].value:
-            logger.debug("BLE device @ %s is already paired", self.address)
+            logger.debug("Bluetooth device @ %s is already paired", self.address)
             return
 
         # Set device as trusted.
@@ -499,7 +499,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         assert reply
         assert_reply(reply)
 
-        logger.debug("Pairing to BLE device @ %s", self.address)
+        logger.debug("Pairing to Bluetooth device @ %s", self.address)
 
         reply = await self._bus.call(
             Message(
