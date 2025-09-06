@@ -41,15 +41,17 @@ class BluetoothSpeakerConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             mac = user_input[CONF_ADDRESS]
+            name = self._discovered_devices.get(mac, mac)
 
             await self.async_set_unique_id(format_mac(mac))
             self._abort_if_unique_id_configured()
 
             if not errors:
                 return self.async_create_entry(
-                    title=self._discovered_devices[mac],
+                    title=name,
                     data={
                         CONF_ADDRESS: mac,
+                        CONF_NAME: name,
                     },
                 )
 
@@ -105,6 +107,7 @@ class BluetoothSpeakerConfigFlow(ConfigFlow, domain=DOMAIN):
                 title=self._discovered[CONF_NAME],
                 data={
                     CONF_ADDRESS: self._discovered[CONF_ADDRESS],
+                    CONF_NAME: self._discovered[CONF_NAME],
                 },
             )
 
