@@ -125,7 +125,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
 
         stack.callback(self._cleanup_all)
 
-    async def _setup_device_watcher(self, manager: BlueZManager):
+    def _setup_device_watcher(self, manager: BlueZManager):
         """Register for device notifications."""
         def on_connected_changed(connected: bool) -> None:
             if not connected:
@@ -211,7 +211,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
                     # Each BLE connection session needs a new D-Bus connection to avoid a
                     # BlueZ quirk where notifications are automatically enabled on reconnect.
                     await self._setup_dbus_connection(stack)
-                    await self._setup_device_watcher(manager)
+                    self._setup_device_watcher(manager)
 
                     self._disconnect_monitor_event = local_disconnect_monitor_event = (
                         asyncio.Event()
