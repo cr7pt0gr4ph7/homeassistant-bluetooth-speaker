@@ -33,6 +33,11 @@ class BluetoothSpeakerDevice:
         self.client = BleakClient(ble_device)
 
     @property
+    def address(self) -> str:
+        """Gets the address of the Bluetooth device."""
+        return self.client.address
+
+    @property
     def is_connected(self) -> bool:
         """Whether the Bluetooth speaker is currently connected."""
         return self.client.is_connected
@@ -84,5 +89,7 @@ class BluetoothSpeakerCoordinator(DataUpdateCoordinator[None]):
         """Update status of Bluetooth speaker."""
         try:
             await self.device.update()
+            self.last_update_success = True
         except Exception as err:
+            self.last_update_success = False
             raise UpdateFailed(f"Unable to fetch data: {err}") from err

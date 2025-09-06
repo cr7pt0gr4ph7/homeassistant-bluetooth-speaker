@@ -7,14 +7,14 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
     MediaType,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import BluetoothSpeakerConfigEntry
+from .coordinator import BluetoothSpeakerConfigEntry, BluetoothSpeakerCoordinator
 
 
 async def async_setup_entry(
@@ -23,15 +23,16 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the Bluetooth speaker config entry."""
+    coordinator = config_entry.runtime_data
     await async_add_entities([
         BluetoothSpeakerPlayer(
             config_entry.options[CONF_NAME],
-            config_entry.options[CONF_ADDRESS],
+            coordinator,
         )
     ])
 
 
-class BluetoothSpeakerPlayer(MediaPlayerEntity):
+class BluetoothSpeakerPlayer(CoordinatorEntity[BluetoothSpeakerCoordinator], MediaPlayerEntity):
     """A media player controlling a Bluetooth speaker."""
 
     _attr_should_poll = False
@@ -44,26 +45,29 @@ class BluetoothSpeakerPlayer(MediaPlayerEntity):
         | MediaPlayerEntityFeature.TURN_OFF
     )
 
-    def __init__(self, name: str, address: str) -> None:
+    def __init__(self, name: str, coordinator: BluetoothSpeakerCoordinator) -> None:
         """Initialize the Bluetooth speaker device."""
+        super().__init__(coordinator)
         self._attr_name = name
         self._attr_device_info = dr.DeviceInfo(
-            identifiers={(DOMAIN, address)},
-            connections={(dr.CONNECTION_BLUETOOTH, address)},
+            identifiers={(DOMAIN, coordinator.device.address)},
+            connections={(dr.CONNECTION_BLUETOOTH, coordinator.device.address)},
         )
-        self._attr_state = MediaPlayerState.OFF
         self._attr_volume_level = 1.0
         self._attr_is_volume_muted = False
 
-    def turn_on(self) -> None:
-        """Connect to the Bluetooth speaker."""
-        self._attr_state = MediaPlayerState.ON
-        self.schedule_update_ha_state()
+    @property
+    def state(self) -> MediaPlayerState:
+        """State of the player."""
+        return MediaPlayerState.ON if self.coordinator.device.is_connected else MediaPlayerState.OFF
 
-    def turn_off(self) -> None:
+    async def async_turn_on(self) -> None:
+        """Connect to the Bluetooth speaker."""
+        await self.coordinator.device.connect()
+
+    async def async_turn_off(self) -> None:
         """Disconnect from the Bluetooth speaker."""
-        self._attr_state = MediaPlayerState.OFF
-        self.schedule_update_ha_state()
+        await self.coordinator.device.disconnect()
 
     def mute_volume(self, mute: bool) -> None:
         """Mute the Bluetooth speaker."""
