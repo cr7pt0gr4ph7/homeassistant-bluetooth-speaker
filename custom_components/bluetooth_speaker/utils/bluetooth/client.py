@@ -150,12 +150,13 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
                 )
 
     async def _resolve_device_from_manager(self) -> BLEDevice | None:
+        device_identifier = self.address.lower()
         manager = await get_global_bluez_manager()
 
         for device_path in manager._properties:
             if defs.DEVICE_INTERFACE in manager._properties[device_path]:
                 props = manager._properties[device_path][defs.DEVICE_INTERFACE]
-                if props["Address"] == self.address:
+                if props["Address"].lower() == device_identifier:
                     return BLEDevice(props["Address"], props["Name"], {
                         "details": props,
                         "path": device_path,
