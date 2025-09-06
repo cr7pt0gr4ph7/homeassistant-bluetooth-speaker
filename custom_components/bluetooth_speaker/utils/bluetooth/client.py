@@ -104,6 +104,23 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
         # used to ensure device gets disconnected if event loop crashes
         self._disconnect_monitor_event: Optional[asyncio.Event] = None
 
+    # Internal methods
+
+    async def _ensure_dbus_connection(self) -> None:
+        """Ensure that we are connected to D-Bus."""
+        if not self._bus:
+            await self._setup_dbus_connection()
+
+    async def _setup_dbus_connection(self) -> None:
+        """Establish connection to D-Bus."""
+        assert not self._bus
+
+        self._bus = await MessageBus(
+            bus_type=BusType.SYSTEM,
+            negotiate_unix_fd=True,
+            auth=get_dbus_authenticator(),
+        ).connect()
+
     # Connectivity methods
 
     @override
@@ -155,11 +172,7 @@ class BluetoothClientBlueZDBus(BaseBleakClient):
                 async with AsyncExitStack() as stack:
                     # Each BLE connection session needs a new D-Bus connection to avoid a
                     # BlueZ quirk where notifications are automatically enabled on reconnect.
-                    self._bus = await MessageBus(
-                        bus_type=BusType.SYSTEM,
-                        negotiate_unix_fd=True,
-                        auth=get_dbus_authenticator(),
-                    ).connect()
+                    await self._setup_dbus_connection()
 
                     stack.callback(self._cleanup_all)
 
