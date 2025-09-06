@@ -24,7 +24,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Bluetooth speaker config entry."""
     coordinator = config_entry.runtime_data
-    await async_add_entities([
+    async_add_entities([
         BluetoothSpeakerPlayer(
             config_entry.data[CONF_NAME],
             coordinator,
