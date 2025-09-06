@@ -49,7 +49,7 @@ class BluetoothSpeakerDevice:
 
     async def connect(self) -> None:
         """Attempt to connect to the Bluetooth device."""
-        await self.client.connect()
+        await self.client.connect(True)
 
     async def disconnect(self) -> None:
         """Disconnect from the Bluetooth device."""
